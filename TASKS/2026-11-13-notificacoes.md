@@ -43,13 +43,13 @@ são fora do escopo da spec (permanente).
   Testes: os dois casos criam notificação não lida para o **paciente** (não para a recepção);
   marcar para horário ocupado (409) não cria notificação.
 
-- [ ] **05. Notificação ao remarcar (com atomicidade)** — NT
+- [x] **05. Notificação ao remarcar (com atomicidade)** — NT
   `agendamento.service.remarcar`: cria `consulta_remarcada` para o paciente na mesma transação,
   antes do `_commit`.
   Testes: remarcar cria a notificação (paciente e recepção); remarcar para horário ocupado →
   409 e **zero** notificações (rollback da transação); a original continua intacta.
 
-- [ ] **06. Notificação ao cancelar pela clínica** — NT
+- [x] **06. Notificação ao cancelar pela clínica** — NT
   `agendamento.service.cancelar`: cria `consulta_cancelada` **somente** quando o autor é
   recepção/admin, na mesma transação, antes do commit.
   Testes: cancelamento pela recepção cria; cancelamento pelo paciente não cria; cancelamento

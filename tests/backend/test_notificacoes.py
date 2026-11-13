@@ -115,3 +115,65 @@ def test_marcar_para_horario_ocupado_nao_cria_notificacao(client, db, c):
     outro = criar_paciente(c)
     assert marcar(client, c, f"{SEG} 09:00", usuario=c["recepcao"], paciente_id=outro.id).status_code == 409
     assert db.query(Notificacao).count() == 1  # só a notificação da primeira marcação
+
+
+# ---------- notificação ao remarcar (atomicidade) ----------
+
+def remarcar(client, c, consulta_id, inicio, usuario=None):
+    return client.post(f"/api/consultas/{consulta_id}/remarcar",
+                       json={"inicio": local(inicio).isoformat()},
+                       headers=auth(usuario or c["paciente"]))
+
+
+def test_remarcar_cria_notificacao_com_data_antiga_e_nova(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    r = remarcar(client, c, consulta_id, f"{SEG} 10:00")
+    assert r.status_code == 201, r.text
+    n = db.query(Notificacao).filter_by(tipo="consulta_remarcada").one()
+    assert n.usuario_id == c["paciente"].id and n.consulta_id == r.json()["id"]
+    assert "de 12/10/2026 às 09:00 para 12/10/2026 às 10:00" in n.texto
+
+
+def test_remarcar_pela_recepcao_tambem_notifica_o_paciente(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    assert remarcar(client, c, consulta_id, f"{SEG} 10:00", usuario=c["recepcao"]).status_code == 201
+    n = db.query(Notificacao).filter_by(tipo="consulta_remarcada").one()
+    assert n.usuario_id == c["paciente"].id
+
+
+def test_remarcar_para_horario_ocupado_nao_deixa_notificacao(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    outro = criar_paciente(c)
+    assert marcar(client, c, f"{SEG} 10:00", usuario=c["recepcao"], paciente_id=outro.id).status_code == 201
+    r = remarcar(client, c, consulta_id, f"{SEG} 10:00")
+    assert r.status_code == 409
+    assert db.query(Notificacao).filter_by(tipo="consulta_remarcada").count() == 0  # rollback remove a notificação
+
+
+# ---------- notificação ao cancelar pela clínica ----------
+
+def cancelar(client, c, consulta_id, usuario=None):
+    return client.post(f"/api/consultas/{consulta_id}/cancelar", headers=auth(usuario or c["paciente"]))
+
+
+def test_cancelamento_pela_recepcao_notifica_o_paciente(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    r = cancelar(client, c, consulta_id, usuario=c["recepcao"])
+    assert r.status_code == 200 and r.json()["status"] == "cancelada_clinica"
+    n = db.query(Notificacao).filter_by(tipo="consulta_cancelada").one()
+    assert n.usuario_id == c["paciente"].id and n.consulta_id == consulta_id
+    assert "cancelada pela clínica" in n.texto
+
+
+def test_cancelamento_pelo_paciente_nao_cria_notificacao(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    r = cancelar(client, c, consulta_id)
+    assert r.status_code == 200 and r.json()["status"] == "cancelada_paciente"
+    assert db.query(Notificacao).filter_by(tipo="consulta_cancelada").count() == 0
+
+
+def test_cancelar_consulta_ja_cancelada_nao_cria_notificacao(client, db, c):
+    consulta_id = marcar(client, c, f"{SEG} 09:00").json()["id"]
+    assert cancelar(client, c, consulta_id).status_code == 200
+    assert cancelar(client, c, consulta_id, usuario=c["recepcao"]).status_code == 422
+    assert db.query(Notificacao).filter_by(tipo="consulta_cancelada").count() == 0

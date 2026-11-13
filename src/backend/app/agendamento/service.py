@@ -214,6 +214,9 @@ def _cancelar_sem_commit(db: Session, consulta: Consulta, autor: Usuario) -> Non
 
 def cancelar(db: Session, consulta: Consulta, autor: Usuario) -> Consulta:
     _cancelar_sem_commit(db, consulta, autor)
+    if autor.perfil in EQUIPE:
+        paciente = db.get(Usuario, consulta.paciente_id)
+        notificar_consulta_cancelada_clinica(db, paciente, consulta)
     db.commit()
     return consulta
 
@@ -230,6 +233,7 @@ def remarcar(db: Session, consulta: Consulta, autor: Usuario, inicio: datetime, 
         _cancelar_sem_commit(db, consulta, autor)
         db.flush()
         nova = _criar(db, autor, paciente, dados, remarcacoes=consulta.remarcacoes + 1, origem_id=consulta.id)
+        notificar_consulta_remarcada(db, paciente, consulta, nova)
     except Exception:
         db.rollback()
         raise
