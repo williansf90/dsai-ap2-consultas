@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, type InitialEntry } from "react-router-dom
 import { vi } from "vitest";
 import { AuthProvider } from "@/shared/auth";
 
-type Resposta = { status?: number; corpo?: unknown };
+type Resposta = { status?: number; corpo?: unknown; texto?: string; cabecalhos?: Record<string, string> };
 type Rota = (url: string, init?: RequestInit) => Resposta | undefined;
 
 /** Substitui fetch: cada chamada passa pelas rotas até alguma responder. */
@@ -15,9 +15,15 @@ export function mockFetch(...rotas: Rota[]) {
     for (const rota of rotas) {
       const r = rota(url, init);
       if (r) {
+        if (r.texto !== undefined) {
+          return new Response(r.texto, {
+            status: r.status ?? 200,
+            headers: { "Content-Type": "text/calendar; charset=utf-8", ...r.cabecalhos },
+          });
+        }
         return new Response(r.status === 204 ? null : JSON.stringify(r.corpo ?? {}), {
           status: r.status ?? 200,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...r.cabecalhos },
         });
       }
     }

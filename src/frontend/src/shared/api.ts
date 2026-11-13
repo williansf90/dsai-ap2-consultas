@@ -68,3 +68,45 @@ export async function api<T>(caminho: string, opcoes: RequestInit = {}, tentarRe
   if (!r.ok) throw new ErroApi(r.status, mensagemDeErro(r.status, corpo), (corpo ?? {}) as Record<string, unknown>);
   return corpo as T;
 }
+
+function headersAutorizados(): Headers {
+  const tokens = lerTokens();
+  const headers = new Headers();
+  if (tokens) headers.set("Authorization", `Bearer ${tokens.access_token}`);
+  return headers;
+}
+
+/**
+ * Baixa um arquivo (resposta não-JSON) reutilizando o fluxo de autenticação do `api()`:
+ * em 401, renova o token e repete a requisição uma única vez.
+ */
+export async function apiDownload(caminho: string): Promise<{ blob: Blob; texto: string; nomeArquivo: string }> {
+  let r = await fetch(`/api${caminho}`, { headers: headersAutorizados() });
+  if (r.status === 401 && lerTokens() && (await renovar())) {
+    r = await fetch(`/api${caminho}`, { headers: headersAutorizados() });
+  }
+  if (!r.ok) {
+    const corpo = await r.json().catch(() => null);
+    throw new ErroApi(r.status, mensagemDeErro(r.status, corpo), (corpo ?? {}) as Record<string, unknown>);
+  }
+  const texto = await r.text();
+  const disposicao = r.headers.get("Content-Disposition") ?? "";
+  const casado = /filename="?([^";]+)"?/.exec(disposicao);
+  return {
+    blob: new Blob([texto], { type: "text/calendar; charset=utf-8" }),
+    texto,
+    nomeArquivo: casado?.[1] ?? "consultas.ics",
+  };
+}
+
+/** Dispara o download de um Blob no navegador. */
+export function salvarBlob(blob: Blob, nomeArquivo: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

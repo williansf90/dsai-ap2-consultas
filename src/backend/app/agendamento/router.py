@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.agenda.service import obter_profissional
@@ -31,6 +31,17 @@ def marcar(dados: MarcarIn, usuario=Depends(quem_marca), db: Session = Depends(g
 @router.get("/consultas/minhas", response_model=MinhasConsultas)
 def minhas(usuario=Depends(exige_perfil("paciente")), db: Session = Depends(get_db)):
     return service.minhas(db, usuario)
+
+
+@router.get("/consultas/minhas/exportar.ics")
+def exportar_calendario(usuario=Depends(exige_perfil("paciente")), db: Session = Depends(get_db)):
+    consultas = service.consultas_exportaveis(db, usuario)
+    conteudo = service.gerar_ical(consultas)
+    return Response(
+        content=conteudo,
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="consultas.ics"'},
+    )
 
 
 @router.get("/consultas/{consulta_id}", response_model=ConsultaOut)

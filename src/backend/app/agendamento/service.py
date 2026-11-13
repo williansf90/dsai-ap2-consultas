@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import UUID, uuid5
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -277,4 +278,79 @@ def buscar_pacientes(db: Session, q: str) -> list[Usuario]:
         select(Usuario).where(Usuario.perfil == "paciente", Usuario.ativo.is_(True), or_(*filtros))
         .order_by(Usuario.nome).limit(20)
     ))
+
+
+# ---------- exportação iCal (RFC 5545) ----------
+
+STATUS_EXPORTAVEIS = ("marcada", "confirmada")
+PRODID = "-//MarcaConsulta//Consultas//PT-BR"
+# identificação canônica do projeto para os UIDs (RFC 4122: namespace é um UUID fixo)
+NAMESPACE_MARCACONSULTA = UUID("4c7f9f6d-2e1b-4a3c-8d5e-9f0a1b2c3d4e")
+
+
+def consultas_exportaveis(db: Session, paciente: Usuario) -> list[Consulta]:
+    """RN02/RN03/RN04: consultas futuras do paciente, marcadas/confirmadas, por início."""
+    return list(db.scalars(
+        select(Consulta)
+        .where(Consulta.paciente_id == paciente.id,
+               Consulta.status.in_(STATUS_EXPORTAVEIS),
+               Consulta.inicio > agora_utc())
+        .order_by(Consulta.inicio)
+    ))
+
+
+def _uid_consulta(consulta: Consulta) -> str:
+    """UID determinístico e estável por consulta (UUID5 no namespace do projeto)."""
+    return str(uuid5(NAMESPACE_MARCACONSULTA, f"consulta:{consulta.id}"))
+
+
+def _texto_ical(texto: str) -> str:
+    """Escapa texto conforme a RFC 5545 (barra, ponto-e-vírgula, vírgula e quebras)."""
+    return (texto.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+            .replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n"))
+
+
+def _dobrar_linha(linha: str) -> str:
+    """Dobra a linha em até 75 octetos, sem partir caractere multibyte (UTF-8)."""
+    partes, atual = [], ""
+    for ch in linha:
+        if len((atual + ch).encode("utf-8")) > 75:
+            partes.append(atual)
+            atual = " "
+        atual += ch
+    partes.append(atual)
+    return "\r\n".join(partes)
+
+
+def _utc_z(dt: datetime) -> str:
+    """Timestamp UTC no formato iCalendar (sufixo Z); exige datetime com fuso."""
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise RegraViolada("Horário da consulta sem fuso horário.")
+    return dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def gerar_ical(consultas: list[Consulta]) -> str:
+    """Gera um VCALENDAR válido (RFC 5545) com um VEVENT por consulta."""
+    linhas = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        f"PRODID:{PRODID}",
+        "CALSCALE:GREGORIAN",
+    ]
+    agora = agora_utc()
+    for c in consultas:
+        linhas += [
+            "BEGIN:VEVENT",
+            f"UID:{_uid_consulta(c)}",
+            f"DTSTAMP:{_utc_z(agora)}",
+            f"DTSTART:{_utc_z(c.inicio)}",
+            f"DTEND:{_utc_z(c.fim)}",
+            "SUMMARY:Consulta médica",
+            f"DESCRIPTION:Profissional: {_texto_ical(c.profissional.nome)}\\nUnidade: {_texto_ical(c.unidade.nome)}",
+        ]
+        if c.unidade.endereco:
+            linhas.append(f"LOCATION:{_texto_ical(f'{c.unidade.nome} — {c.unidade.endereco}')}")
+        linhas.append("END:VEVENT")
+    linhas.append("END:VCALENDAR")
+    return "\r\n".join(_dobrar_linha(linha) for linha in linhas) + "\r\n"
 
