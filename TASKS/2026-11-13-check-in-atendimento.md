@@ -95,7 +95,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: lista renderiza; check-in chama POST e atualiza; faltou só com a flag; fake timers
   avançam 30 s e refazem a busca; erro 403 de unidade não permitida aparece em português.
 
-- [ ] **13. Ações do profissional na agenda (frontend)** — CH
+- [x] **13. Ações do profissional na agenda (frontend)** — CH
   `AgendaProfissional.tsx`: "Chamar" em confirmada, "Finalizar" em em_atendimento (textarea
   com contador até 5.000, erro 422 exibido), "Ver anotação" em realizada (GET sob demanda).
   Testes: botões por status; finalizar envia anotação; contador limita a 5.000; erro do

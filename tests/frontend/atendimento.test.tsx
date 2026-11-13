@@ -1,6 +1,7 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
+import AgendaProfissional from "@/features/agenda/AgendaProfissional";
 import FilaDoDia from "@/features/atendimento/FilaDoDia";
 import { mockFetch, renderizar } from "./apoio";
 
@@ -104,4 +105,107 @@ test("recepção sem unidades vinculadas vê o aviso", async () => {
   mockFetch((url: string) => (url.endsWith("/fila/unidades") ? { corpo: [] } : undefined));
   renderizar(<FilaDoDia />);
   expect(await screen.findByText("Nenhuma unidade vinculada ao seu acesso.")).toBeInTheDocument();
+});
+
+// ---------- ações de atendimento na agenda do profissional ----------
+
+const consultaAgenda = (extra = {}) => ({
+  id: 1,
+  inicio: "2026-10-12T12:00:00Z",
+  fim: "2026-10-12T12:30:00Z",
+  status: "confirmada",
+  forma_pagamento: "particular",
+  preco_centavos: 25000,
+  remarcacoes: 0,
+  paciente: { id: 2, nome: "Maria Paciente" },
+  profissional: { id: 10, nome: "Dr. João Souza" },
+  unidade: { id: 5, nome: "Unidade Centro", endereco: "Rua A, 1" },
+  tipo_consulta: { id: 3, nome: "Consulta", duracao_min: 30 },
+  pode_cancelar: false,
+  pode_remarcar: false,
+  ...extra,
+});
+
+function rotasAgenda(consultas: unknown[] = [consultaAgenda()]) {
+  return [
+    (url: string) =>
+      url.endsWith("/eu/profissional")
+        ? { corpo: { id: 10, nome: "Dr. João Souza", unidades: [{ id: 5, nome: "Unidade Centro" }] } }
+        : undefined,
+    (url: string) => (url.includes("/profissionais/10/agenda") ? { corpo: consultas } : undefined),
+  ];
+}
+
+async function abrirAgendaNaData() {
+  renderizar(<AgendaProfissional />);
+  await screen.findByLabelText("Data");
+  fireEvent.change(screen.getByLabelText("Data"), { target: { value: "2026-10-12" } });
+  await screen.findByText("Maria Paciente");
+}
+
+test("agenda oferece chamar para consulta confirmada e envia o POST", async () => {
+  const fetch = mockFetch(
+    ...rotasAgenda([consultaAgenda({ status: "confirmada" })]),
+    (url: string, init?: RequestInit) =>
+      url.includes("/chamar") && init?.method === "POST" ? { corpo: consultaAgenda({ status: "em_atendimento" }) } : undefined,
+  );
+  await abrirAgendaNaData();
+  await userEvent.click(screen.getByRole("button", { name: "Chamar" }));
+  await waitFor(() =>
+    expect(fetch.mock.calls.some(([u, init]) => String(u).includes("/chamar") && init?.method === "POST")).toBe(true),
+  );
+});
+
+test("finalizar exige anotação e envia o texto digitado", async () => {
+  const fetch = mockFetch(
+    ...rotasAgenda([consultaAgenda({ status: "em_atendimento" })]),
+    (url: string, init?: RequestInit) =>
+      url.includes("/finalizar") && init?.method === "POST" ? { corpo: consultaAgenda({ status: "realizada" }) } : undefined,
+  );
+  await abrirAgendaNaData();
+  await userEvent.click(screen.getByRole("button", { name: "Finalizar" }));
+  const botao = screen.getByRole("button", { name: "Finalizar atendimento" });
+  expect(botao).toBeDisabled();
+  await userEvent.type(screen.getByLabelText("Anotação do atendimento"), "Boa evolução.");
+  expect(screen.getByText("13/5000")).toBeInTheDocument();
+  expect(botao).toBeEnabled();
+  await userEvent.click(botao);
+  await waitFor(() =>
+    expect(fetch.mock.calls.some(([u, init]) => String(u).includes("/finalizar") && init?.method === "POST")).toBe(true),
+  );
+  const post = fetch.mock.calls.find(([u, init]) => String(u).includes("/finalizar") && init?.method === "POST");
+  expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ anotacao: "Boa evolução." });
+});
+
+test("erro do finalizar aparece em português", async () => {
+  mockFetch(
+    ...rotasAgenda([consultaAgenda({ status: "em_atendimento" })]),
+    (url: string, init?: RequestInit) =>
+      url.includes("/finalizar") && init?.method === "POST"
+        ? { status: 422, corpo: { detail: "A anotação deve ter no máximo 5000 caracteres." } }
+        : undefined,
+  );
+  await abrirAgendaNaData();
+  await userEvent.click(screen.getByRole("button", { name: "Finalizar" }));
+  await userEvent.type(screen.getByLabelText("Anotação do atendimento"), "teste");
+  await userEvent.click(screen.getByRole("button", { name: "Finalizar atendimento" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("A anotação deve ter no máximo");
+});
+
+test("ver anotação de consulta realizada carrega da API", async () => {
+  mockFetch(
+    ...rotasAgenda([consultaAgenda({ status: "realizada" })]),
+    (url: string) => (url.includes("/anotacao") ? { corpo: { anotacao: "Evolução boa." } } : undefined),
+  );
+  await abrirAgendaNaData();
+  await userEvent.click(screen.getByRole("button", { name: "Ver anotação" }));
+  expect(await screen.findByText("Evolução boa.")).toBeInTheDocument();
+});
+
+test("consulta marcada não mostra ações de atendimento", async () => {
+  mockFetch(...rotasAgenda([consultaAgenda({ status: "marcada" })]));
+  await abrirAgendaNaData();
+  expect(screen.queryByRole("button", { name: "Chamar" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Finalizar" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ver anotação" })).not.toBeInTheDocument();
 });

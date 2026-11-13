@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import AcoesAtendimento from "@/features/atendimento/AcoesAtendimento";
 import { ROTULO_STATUS, type Consulta } from "@/features/agendamento/tipos";
 import { api } from "@/shared/api";
 import { diaLocal, formatarData, formatarHora, inicioDaSemana, somarDias } from "@/shared/datas";
@@ -70,6 +71,7 @@ export default function AgendaProfissional() {
                       {c.tipo_consulta.nome} · {c.unidade.nome}
                     </span>
                     <span className={`status status-${c.status}`}>{ROTULO_STATUS[c.status] ?? c.status}</span>
+                    <AcoesAtendimento consulta={c} />
                   </li>
                 ))}
               </ul>
