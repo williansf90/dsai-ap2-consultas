@@ -163,3 +163,47 @@ def test_dois_check_ins_simultaneos_so_um_vence(c):
     for t in threads:
         t.join()
     assert sorted(respostas) == [200, 422]
+
+
+# ---------- chamar ----------
+
+def chamar(client, consulta_id, usuario):
+    return client.post(f"/api/consultas/{consulta_id}/chamar", headers=auth(usuario))
+
+
+def preparar_confirmada(client, c):
+    assert check_in(client, c["consulta"].id, c["paciente"]).status_code == 200
+
+
+def test_profissional_dono_chama_e_registra_inicio(client, db, c):
+    preparar_confirmada(client, c)
+    r = chamar(client, c["consulta"].id, c["prof_usuario"])
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "em_atendimento"
+    db.refresh(c["consulta"])
+    assert c["consulta"].atendimento_inicio == Relogio.atual
+    ultimo = (
+        db.query(HistoricoStatus)
+        .filter_by(consulta_id=c["consulta"].id)
+        .order_by(HistoricoStatus.id.desc())
+        .first()
+    )
+    assert (ultimo.para_status, ultimo.usuario_id) == ("em_atendimento", c["prof_usuario"].id)
+
+
+def test_chamar_sem_check_in_devolve_422(client, c):
+    assert chamar(client, c["consulta"].id, c["prof_usuario"]).status_code == 422
+
+
+def test_chamar_duas_vezes_devolve_422(client, c):
+    preparar_confirmada(client, c)
+    assert chamar(client, c["consulta"].id, c["prof_usuario"]).status_code == 200
+    assert chamar(client, c["consulta"].id, c["prof_usuario"]).status_code == 422
+
+
+def test_outro_profissional_e_recepcao_nao_podem_chamar(client, db, c):
+    preparar_confirmada(client, c)
+    outro = criar_usuario(db, "profissional", nome="Dr. Outro")
+    assert chamar(client, c["consulta"].id, outro).status_code == 403
+    assert chamar(client, c["consulta"].id, c["recepcao"]).status_code == 403
+    assert chamar(client, c["consulta"].id, c["paciente"]).status_code == 403

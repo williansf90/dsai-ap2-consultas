@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.agendamento.models import Consulta
 from app.agendamento.service import mudar_status
 from app.auth.models import Usuario
-from app.core.erros import NaoEncontrado, RegraViolada
+from app.core.erros import NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
 
 ANTECEDENCIA_CHECK_IN = timedelta(hours=1)
@@ -37,5 +37,16 @@ def check_in(db: Session, consulta_id: int, autor: Usuario) -> Consulta:
         raise RegraViolada("O check-in só é possível no dia da consulta, a partir de 1 hora antes do horário.")
     mudar_status(db, consulta, "confirmada", autor)
     consulta.chegada_em = agora
+    db.commit()
+    return consulta
+
+
+def chamar(db: Session, consulta_id: int, autor: Usuario) -> Consulta:
+    """confirmada → em_atendimento; só o profissional dono; grava atendimento_inicio."""
+    consulta = obter_para_transicao(db, consulta_id)
+    if consulta.profissional.usuario_id != autor.id:
+        raise Proibido("Somente o profissional desta consulta pode chamar o paciente.")
+    mudar_status(db, consulta, "em_atendimento", autor)
+    consulta.atendimento_inicio = agora_utc()
     db.commit()
     return consulta

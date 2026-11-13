@@ -43,7 +43,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   duplicado (já confirmada) → 422; cancelada/realizada → 422; paciente não dono → 404;
   `chegada_em` gravada; histórico registra quem.
 
-- [ ] **05. Chamar** — CH
+- [x] **05. Chamar** — CH
   `POST /consultas/{id}/chamar` somente para o profissional dono da consulta:
   `confirmada → em_atendimento` + `atendimento_inicio` + histórico.
   Testes: dono OK; outro profissional → 403; recepção → 403; paciente → 403; sem check-in
