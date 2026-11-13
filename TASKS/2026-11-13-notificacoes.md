@@ -55,7 +55,7 @@ são fora do escopo da spec (permanente).
   Testes: cancelamento pela recepção cria; cancelamento pelo paciente não cria; cancelamento
   de consulta já cancelada não cria nada além do 422.
 
-- [ ] **07. Endpoints da central** — NT
+- [x] **07. Endpoints da central** — NT
   `app/notificacoes/{schemas,service,router}.py` + registro em `app/main.py`:
   GET `/notificacoes` (paginado, 20/página, mais recentes primeiro, com `nao_lidas`),
   PATCH `/notificacoes/{id}/lida` e POST `/notificacoes/marcar-todas-lidas`.

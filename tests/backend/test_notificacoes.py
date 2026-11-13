@@ -177,3 +177,69 @@ def test_cancelar_consulta_ja_cancelada_nao_cria_notificacao(client, db, c):
     assert cancelar(client, c, consulta_id).status_code == 200
     assert cancelar(client, c, consulta_id, usuario=c["recepcao"]).status_code == 422
     assert db.query(Notificacao).filter_by(tipo="consulta_cancelada").count() == 0
+
+
+# ---------- central: listar, marcar lida, marcar todas ----------
+
+def criar_notificacao(db, usuario_id, texto_extra=""):
+    return criar(db, usuario_id, "consulta_marcada", variaveis={
+        "profissional": "Dr. João Souza", "tipo_consulta": "Consulta",
+        "unidade": "Unidade Centro", "data_hora": local(f"{SEG} 09:00"),
+    })
+
+
+def test_lista_so_as_proprias_e_conta_nao_lidas(client, db, c):
+    marcar(client, c, f"{SEG} 09:00")
+    marcar(client, c, f"{SEG} 10:00")
+    criar_notificacao(db, criar_paciente(c).id)  # de outro usuário
+    db.commit()
+    r = client.get("/api/notificacoes", headers=auth(c["paciente"]))
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["total"] == 2 and corpo["nao_lidas"] == 2  # privacidade: as do outro não aparecem
+    assert all("usuario_id" not in n for n in corpo["itens"])  # não expõe destinatário
+    assert corpo["itens"][0]["id"] > corpo["itens"][1]["id"]  # mais recentes primeiro
+    assert all(n["lida_em"] is None for n in corpo["itens"])
+
+
+def test_paginacao_da_lista(client, db, c):
+    for _ in range(25):
+        criar_notificacao(db, c["paciente"].id)
+    db.commit()
+    r = client.get("/api/notificacoes?pagina=2&por_pagina=10", headers=auth(c["paciente"]))
+    corpo = r.json()
+    assert (corpo["total"], corpo["pagina"], corpo["paginas"]) == (25, 2, 3)
+    assert len(corpo["itens"]) == 10
+
+
+def test_marcar_lida_propria(client, db, c):
+    marcar(client, c, f"{SEG} 09:00")
+    n = db.query(Notificacao).one()
+    r = client.patch(f"/api/notificacoes/{n.id}/lida", headers=auth(c["paciente"]))
+    assert r.status_code == 200 and r.json()["lida_em"] is not None
+    assert client.get("/api/notificacoes", headers=auth(c["paciente"])).json()["nao_lidas"] == 0
+
+
+def test_marcar_lida_de_outro_usuario_devolve_404(client, db, c):
+    marcar(client, c, f"{SEG} 09:00")
+    n = db.query(Notificacao).one()
+    r = client.patch(f"/api/notificacoes/{n.id}/lida", headers=auth(criar_paciente(c)))
+    assert r.status_code == 404
+    db.refresh(n)
+    assert n.lida_em is None
+
+
+def test_marcar_todas_lidas(client, db, c):
+    marcar(client, c, f"{SEG} 09:00")
+    marcar(client, c, f"{SEG} 10:00")
+    r = client.post("/api/notificacoes/marcar-todas-lidas", headers=auth(c["paciente"]))
+    assert r.status_code == 200 and r.json() == {"atualizadas": 2}
+    assert client.get("/api/notificacoes", headers=auth(c["paciente"])).json()["nao_lidas"] == 0
+    r2 = client.post("/api/notificacoes/marcar-todas-lidas", headers=auth(c["paciente"]))
+    assert r2.json() == {"atualizadas": 0}
+
+
+def test_sem_token_devolve_401(client):
+    assert client.get("/api/notificacoes").status_code == 401
+    assert client.patch("/api/notificacoes/1/lida").status_code == 401
+    assert client.post("/api/notificacoes/marcar-todas-lidas").status_code == 401

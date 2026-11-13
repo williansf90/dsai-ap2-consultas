@@ -11,6 +11,7 @@ from app.busca.router import router as busca_router
 from app.clinicas.router import router as clinicas_router
 from app.core.erros import ErroDominio, tratar_erro_dominio
 from app.health.router import router as health_router
+from app.notificacoes.router import router as notificacoes_router
 
 ROUTERS = (
     health_router,
@@ -20,6 +21,7 @@ ROUTERS = (
     agenda_publico,
     busca_router,
     agendamento_router,
+    notificacoes_router,
 )
 # build do frontend copiado pelo Dockerfile
 PASTA_ESTATICOS = Path(__file__).parent / "static"
