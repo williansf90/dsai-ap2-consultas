@@ -36,7 +36,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: duas threads fazem check-in na mesma consulta → exatamente uma vence (201/200) e a
   outra recebe 422; chamar simultâneo idem; histórico registra apenas a transição vencedora.
 
-- [ ] **04. Check-in** — CH
+- [x] **04. Check-in** — CH
   `POST /consultas/{id}/check-in` para paciente (dono), recepção e admin: `marcada → confirmada`,
   mesmo dia no fuso local e `agora >= inicio − 1h`, grava `chegada_em` e histórico.
   Testes: paciente dono OK; recepção e admin OK; antes de 1h → 422; dia errado → 422;

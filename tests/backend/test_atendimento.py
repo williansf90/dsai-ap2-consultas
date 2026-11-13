@@ -76,3 +76,90 @@ def test_transicao_de_consulta_inexistente_devolve_404(db):
     with pytest.raises(NaoEncontrado) as erro:
         obter_para_transicao(db, 999999)
     assert erro.value.status_code == 404
+
+
+# ---------- check-in ----------
+
+def check_in(client, consulta_id, usuario):
+    return client.post(f"/api/consultas/{consulta_id}/check-in", headers=auth(usuario))
+
+
+def test_paciente_faz_check_in_no_dia_e_registra_chegada(client, db, c):
+    Relogio.atual = local(f"{SEG} 08:30")
+    r = check_in(client, c["consulta"].id, c["paciente"])
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "confirmada"
+    db.refresh(c["consulta"])
+    assert c["consulta"].chegada_em == Relogio.atual
+    ultimo = (
+        db.query(HistoricoStatus)
+        .filter_by(consulta_id=c["consulta"].id)
+        .order_by(HistoricoStatus.id.desc())
+        .first()
+    )
+    assert (ultimo.para_status, ultimo.usuario_id) == ("confirmada", c["paciente"].id)
+
+
+@pytest.mark.parametrize("perfil", ["recepcao", "admin"])
+def test_recepcao_e_admin_tambem_fazem_check_in(client, c, perfil):
+    r = check_in(client, c["consulta"].id, c[perfil])
+    assert r.status_code == 200 and r.json()["status"] == "confirmada"
+
+
+def test_check_in_antes_de_uma_hora_do_horario_devolve_422(client, c):
+    Relogio.atual = local(f"{SEG} 07:00")
+    r = check_in(client, c["consulta"].id, c["paciente"])
+    assert r.status_code == 422
+    assert "1 hora" in r.json()["detail"]
+
+
+def test_check_in_em_outro_dia_devolve_422(client, c):
+    Relogio.atual = local("2026-10-13 08:00")
+    r = check_in(client, c["consulta"].id, c["paciente"])
+    assert r.status_code == 422
+
+
+def test_check_in_duplicado_devolve_422_e_mantem_a_primeira_chegada(client, db, c):
+    assert check_in(client, c["consulta"].id, c["paciente"]).status_code == 200
+    db.refresh(c["consulta"])
+    primeira_chegada = c["consulta"].chegada_em
+    r = check_in(client, c["consulta"].id, c["recepcao"])
+    assert r.status_code == 422
+    db.refresh(c["consulta"])
+    assert c["consulta"].chegada_em == primeira_chegada
+
+
+def test_check_in_de_consulta_cancelada_devolve_422(client, c):
+    r = client.post(f"/api/consultas/{c['consulta'].id}/cancelar", headers=auth(c["recepcao"]))
+    assert r.status_code == 200
+    assert check_in(client, c["consulta"].id, c["paciente"]).status_code == 422
+
+
+def test_check_in_de_outro_paciente_devolve_404(client, db, c):
+    assert check_in(client, c["consulta"].id, criar_usuario(db, nome="Intruso")).status_code == 404
+
+
+def test_profissional_nao_faz_check_in_devolve_403(client, c):
+    assert check_in(client, c["consulta"].id, c["prof_usuario"]).status_code == 403
+
+
+def test_dois_check_ins_simultaneos_so_um_vence(c):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    barreira = Barrier(2)
+    respostas = []
+
+    def tentar(usuario):
+        cliente = TestClient(app)
+        barreira.wait()
+        r = cliente.post(f"/api/consultas/{c['consulta'].id}/check-in", headers=auth(usuario))
+        respostas.append(r.status_code)
+
+    threads = [Thread(target=tentar, args=(u,)) for u in (c["paciente"], c["recepcao"])]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(respostas) == [200, 422]

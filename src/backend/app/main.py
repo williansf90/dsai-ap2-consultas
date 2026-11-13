@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.agenda.router import publico as agenda_publico
 from app.agenda.router import router as agenda_router
 from app.agendamento.router import router as agendamento_router
+from app.atendimento.router import router as atendimento_router
 from app.auth.router import router as auth_router
 from app.busca.router import router as busca_router
 from app.clinicas.router import router as clinicas_router
@@ -21,6 +22,7 @@ ROUTERS = (
     agenda_publico,
     busca_router,
     agendamento_router,
+    atendimento_router,
     notificacoes_router,
 )
 # build do frontend copiado pelo Dockerfile
