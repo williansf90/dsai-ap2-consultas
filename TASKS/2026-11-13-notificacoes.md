@@ -68,7 +68,7 @@ são fora do escopo da spec (permanente).
   Testes: sino visível para paciente e ausente para os demais perfis e deslogado; contagem
   correta a partir do mock da API.
 
-- [ ] **09. Central de notificações** — NT
+- [x] **09. Central de notificações** — NT
   `features/notificacoes/CentralNotificacoes.tsx`: lista paginada, não lidas destacadas,
   botão "Marcar todas como lidas", clique na notificação marca como lida (PATCH) e navega
   para `/minhas-consultas`.
