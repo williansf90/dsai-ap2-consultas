@@ -93,9 +93,9 @@ export async function apiDownload(caminho: string): Promise<{ blob: Blob; texto:
   const disposicao = r.headers.get("Content-Disposition") ?? "";
   const casado = /filename="?([^";]+)"?/.exec(disposicao);
   return {
-    blob: new Blob([texto], { type: "text/calendar; charset=utf-8" }),
+    blob: new Blob([texto], { type: r.headers.get("Content-Type") ?? "application/octet-stream" }),
     texto,
-    nomeArquivo: casado?.[1] ?? "consultas.ics",
+    nomeArquivo: casado?.[1] ?? "arquivo",
   };
 }
 

@@ -2,7 +2,9 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import AgendaProfissional from "@/features/agenda/AgendaProfissional";
+import MinhasConsultas from "@/features/agendamento/MinhasConsultas";
 import FilaDoDia from "@/features/atendimento/FilaDoDia";
+import VinculosRecepcao from "@/features/atendimento/VinculosRecepcao";
 import { mockFetch, renderizar } from "./apoio";
 
 const UNIDADES = [{ id: 5, nome: "Unidade Centro", endereco: "Rua A, 1" }];
@@ -208,4 +210,77 @@ test("consulta marcada não mostra ações de atendimento", async () => {
   expect(screen.queryByRole("button", { name: "Chamar" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Finalizar" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Ver anotação" })).not.toBeInTheDocument();
+});
+
+// ---------- comprovante em minhas consultas ----------
+
+function rotasMinhas(extra = {}) {
+  return (url: string) =>
+    url.endsWith("/consultas/minhas")
+      ? {
+          corpo: {
+            proximas: [consultaAgenda({ status: "marcada", pode_cancelar: true, pode_remarcar: true })],
+            passadas: [consultaAgenda({ id: 3, status: "realizada" })],
+            ...extra,
+          },
+        }
+      : undefined;
+}
+
+test("minhas consultas mostra comprovante somente para realizada", async () => {
+  mockFetch(rotasMinhas());
+  renderizar(<MinhasConsultas />);
+  await userEvent.click(await screen.findByRole("tab", { name: "Passadas (1)" }));
+  expect(screen.getByRole("button", { name: "Comprovante (PDF)" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Próximas (1)" }));
+  expect(screen.queryByRole("button", { name: "Comprovante (PDF)" })).not.toBeInTheDocument();
+});
+
+test("comprovante baixa o PDF com o tipo do servidor", async () => {
+  URL.createObjectURL = vi.fn(() => "blob:mock");
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  mockFetch(
+    rotasMinhas(),
+    (url: string) =>
+      url.endsWith("/comprovante.pdf")
+        ? {
+            texto: "%PDF-1.4 comprovante",
+            cabecalhos: {
+              "Content-Type": "application/pdf",
+              "Content-Disposition": 'attachment; filename="comprovante-3.pdf"',
+            },
+          }
+        : undefined,
+  );
+  renderizar(<MinhasConsultas />);
+  await userEvent.click(await screen.findByRole("tab", { name: "Passadas (1)" }));
+  await userEvent.click(screen.getByRole("button", { name: "Comprovante (PDF)" }));
+  await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+  const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+  expect(blob.type).toBe("application/pdf");
+});
+
+// ---------- vínculos da recepção (admin) ----------
+
+test("admin liga e desliga unidades da recepção", async () => {
+  const fetch = mockFetch(
+    (url: string, init?: RequestInit) =>
+      url.endsWith("/recepcao-unidades") && (init?.method === "POST" || init?.method === "DELETE")
+        ? { corpo: { usuario: { id: 3, nome: "Rita", email: "rita@demo.com" }, unidade_ids: init.method === "POST" ? [5] : [] } }
+        : undefined,
+    (url: string) =>
+      url.endsWith("/recepcao-unidades")
+        ? { corpo: [{ usuario: { id: 3, nome: "Rita", email: "rita@demo.com" }, unidade_ids: [5] }] }
+        : undefined,
+    (url: string) => (url.endsWith("/fila/unidades") ? { corpo: UNIDADES } : undefined),
+  );
+  renderizar(<VinculosRecepcao />);
+  expect(await screen.findByText("Rita")).toBeInTheDocument();
+  const botao = screen.getByRole("button", { name: "Unidade Centro" });
+  expect(botao).not.toHaveClass("secundario");
+  await userEvent.click(botao);
+  await waitFor(() =>
+    expect(fetch.mock.calls.some(([u, init]) => String(u).includes("/recepcao-unidades") && init?.method === "DELETE")).toBe(true),
+  );
 });

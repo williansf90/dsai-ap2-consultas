@@ -53,6 +53,10 @@ export default function MinhasConsultas() {
       salvarBlob(blob, nomeArquivo);
     },
   });
+  const comprovante = useMutation({
+    mutationFn: (id: number) => apiDownload(`/consultas/${id}/comprovante.pdf`),
+    onSuccess: ({ blob, nomeArquivo }) => salvarBlob(blob, nomeArquivo),
+  });
 
   const lista = data?.[aba] ?? [];
   return (
@@ -79,6 +83,11 @@ export default function MinhasConsultas() {
           {(exportar.error as Error).message}
         </p>
       )}
+      {comprovante.error && (
+        <p role="alert" className="erro">
+          {(comprovante.error as Error).message}
+        </p>
+      )}
       {isLoading && <p className="suave">Carregando…</p>}
       {error && <p className="erro">{(error as Error).message}</p>}
       {cancelar.error && (
@@ -102,26 +111,29 @@ export default function MinhasConsultas() {
           key={c.id}
           consulta={c}
           acoes={
-            (c.pode_cancelar || c.pode_remarcar) && (
-              <div className="acoes">
-                {c.pode_remarcar && (
-                  <Link className="botao" to={`/minhas-consultas/${c.id}/remarcar`}>
-                    Remarcar
-                  </Link>
-                )}
-                {c.pode_cancelar && (
-                  <button
-                    className="secundario"
-                    disabled={cancelar.isPending}
-                    onClick={() => {
-                      if (window.confirm("Cancelar esta consulta?")) cancelar.mutate(c.id);
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            )
+            <div className="acoes">
+              {c.status === "realizada" && (
+                <button className="secundario" disabled={comprovante.isPending} onClick={() => comprovante.mutate(c.id)}>
+                  Comprovante (PDF)
+                </button>
+              )}
+              {c.pode_remarcar && (
+                <Link className="botao" to={`/minhas-consultas/${c.id}/remarcar`}>
+                  Remarcar
+                </Link>
+              )}
+              {c.pode_cancelar && (
+                <button
+                  className="secundario"
+                  disabled={cancelar.isPending}
+                  onClick={() => {
+                    if (window.confirm("Cancelar esta consulta?")) cancelar.mutate(c.id);
+                  }}
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           }
         />
       ))}

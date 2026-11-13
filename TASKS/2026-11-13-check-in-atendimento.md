@@ -101,7 +101,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: botões por status; finalizar envia anotação; contador limita a 5.000; erro do
   servidor em português; anotação carregada e exibida.
 
-- [ ] **14. Comprovante, vínculos do admin e revisão final** — CH
+- [x] **14. Comprovante, vínculos do admin e revisão final** — CH
   `MinhasConsultas.tsx`: botão "Comprovante (PDF)" só em realizada (download via
   `apiDownload`); `VinculosRecepcao.tsx` em `/admin/recepcao` (vincular/desvincular recepção
   de unidades); rota e menu; estilos; revisão do diff; `pytest` e `npm test` completos verdes.

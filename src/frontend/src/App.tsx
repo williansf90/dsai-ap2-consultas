@@ -3,6 +3,7 @@ import AgendaProfissional from "@/features/agenda/AgendaProfissional";
 import Disponibilidade from "@/features/agenda/Disponibilidade";
 import AgendarRecepcao from "@/features/agendamento/AgendarRecepcao";
 import FilaDoDia from "@/features/atendimento/FilaDoDia";
+import VinculosRecepcao from "@/features/atendimento/VinculosRecepcao";
 import ConfirmarAgendamento from "@/features/agendamento/ConfirmarAgendamento";
 import MinhasConsultas from "@/features/agendamento/MinhasConsultas";
 import Remarcar from "@/features/agendamento/Remarcar";
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/admin/especialidades" element={<AdminEspecialidades />} />
             <Route path="/admin/profissionais" element={<AdminProfissionais />} />
             <Route path="/admin/feriados" element={<AdminFeriados />} />
+            <Route path="/admin/recepcao" element={<VinculosRecepcao />} />
           </Route>
           <Route path="*" element={<p>Página não encontrada.</p>} />
         </Route>

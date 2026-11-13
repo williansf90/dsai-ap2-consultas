@@ -18,6 +18,7 @@ const MENU: Record<Perfil, { para: string; rotulo: string }[]> = {
     { para: "/admin/profissionais", rotulo: "Profissionais" },
     { para: "/admin/feriados", rotulo: "Feriados" },
     { para: "/recepcao/fila", rotulo: "Fila do dia" },
+    { para: "/admin/recepcao", rotulo: "Vínculos da recepção" },
   ],
 };
 
