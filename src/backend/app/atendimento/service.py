@@ -12,6 +12,7 @@ from app.core.erros import NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
 
 ANTECEDENCIA_CHECK_IN = timedelta(hours=1)
+ANTECEDENCIA_FALTA = timedelta(minutes=30)
 MAX_ANOTACAO = 5000
 
 
@@ -86,3 +87,13 @@ def anotacao(db: Session, consulta_id: int, autor: Usuario) -> str | None:
     if not em_comum:
         raise Proibido("Esta anotação não está disponível para o seu perfil.")
     return consulta.anotacao
+
+
+def marcar_faltou(db: Session, consulta_id: int, autor: Usuario) -> Consulta:
+    """marcada → faltou, a partir de 30 minutos após o horário da consulta."""
+    consulta = obter_para_transicao(db, consulta_id)
+    if agora_utc() < consulta.inicio + ANTECEDENCIA_FALTA:
+        raise RegraViolada("Só é possível marcar falta 30 minutos após o horário da consulta.")
+    mudar_status(db, consulta, "faltou", autor)
+    db.commit()
+    return consulta

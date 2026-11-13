@@ -62,7 +62,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: autor vê; mesma especialidade vê; especialidade diferente → 403; paciente/recepção →
   403; consulta inexistente → 404.
 
-- [ ] **08. Faltou manual** — CH
+- [x] **08. Faltou manual** — CH
   `POST /consultas/{id}/faltou` para recepção/admin: `marcada → faltou` somente com
   `agora >= inicio + 30min`.
   Testes: antes dos 30 min → 422; depois OK + histórico; paciente/profissional → 403;

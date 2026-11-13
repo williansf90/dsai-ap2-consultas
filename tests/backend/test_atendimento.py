@@ -306,3 +306,45 @@ def test_paciente_recepcao_e_admin_nao_veem_a_anotacao(client, db, c, perfil):
 
 def test_anotacao_de_consulta_inexistente_devolve_404(client, c):
     assert ver_anotacao(client, 999999, c["prof_usuario"]).status_code == 404
+
+
+# ---------- faltou manual ----------
+
+def marcar_faltou(client, consulta_id, usuario):
+    return client.post(f"/api/consultas/{consulta_id}/faltou", headers=auth(usuario))
+
+
+def test_faltou_antes_de_30_minutos_devolve_422(client, c):
+    Relogio.atual = local(f"{SEG} 09:00")  # no horário exato, antes dos 30 min
+    assert marcar_faltou(client, c["consulta"].id, c["recepcao"]).status_code == 422
+
+
+def test_faltou_apos_30_minutos_funciona(client, db, c):
+    Relogio.atual = local(f"{SEG} 09:31")
+    r = marcar_faltou(client, c["consulta"].id, c["recepcao"])
+    assert r.status_code == 200 and r.json()["status"] == "faltou"
+    ultimo = (
+        db.query(HistoricoStatus)
+        .filter_by(consulta_id=c["consulta"].id)
+        .order_by(HistoricoStatus.id.desc())
+        .first()
+    )
+    assert (ultimo.para_status, ultimo.usuario_id) == ("faltou", c["recepcao"].id)
+
+
+def test_faltou_duplicado_devolve_422(client, c):
+    Relogio.atual = local(f"{SEG} 09:31")
+    assert marcar_faltou(client, c["consulta"].id, c["recepcao"]).status_code == 200
+    assert marcar_faltou(client, c["consulta"].id, c["recepcao"]).status_code == 422
+
+
+def test_paciente_e_profissional_nao_marcam_faltou(client, c):
+    Relogio.atual = local(f"{SEG} 09:31")
+    assert marcar_faltou(client, c["consulta"].id, c["paciente"]).status_code == 403
+    assert marcar_faltou(client, c["consulta"].id, c["prof_usuario"]).status_code == 403
+
+
+def test_faltou_de_consulta_cancelada_devolve_422(client, c):
+    Relogio.atual = local(f"{SEG} 09:31")
+    assert client.post(f"/api/consultas/{c['consulta'].id}/cancelar", headers=auth(c["recepcao"])).status_code == 200
+    assert marcar_faltou(client, c["consulta"].id, c["recepcao"]).status_code == 422

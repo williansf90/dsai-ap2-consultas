@@ -10,6 +10,7 @@ from app.core.seguranca import exige_perfil, usuario_atual
 
 router = APIRouter(tags=["atendimento"])
 quem_faz_check_in = exige_perfil("paciente", "recepcao", "admin")
+equipe = exige_perfil("recepcao", "admin")
 profissional = exige_perfil("profissional")
 
 
@@ -34,3 +35,9 @@ def finalizar(consulta_id: int, dados: FinalizarIn, usuario=Depends(profissional
 @router.get("/consultas/{consulta_id}/anotacao", response_model=AnotacaoOut)
 def anotacao(consulta_id: int, usuario=Depends(usuario_atual), db: Session = Depends(get_db)):
     return {"anotacao": service.anotacao(db, consulta_id, usuario)}
+
+
+@router.post("/consultas/{consulta_id}/faltou", response_model=ConsultaOut)
+def faltou(consulta_id: int, usuario=Depends(equipe), db: Session = Depends(get_db)):
+    consulta = service.marcar_faltou(db, consulta_id, usuario)
+    return com_permissoes(consulta, usuario)
