@@ -68,7 +68,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: antes dos 30 min → 422; depois OK + histórico; paciente/profissional → 403;
   consulta cancelada → 422.
 
-- [ ] **09. Fila do dia com permissão por unidade** — CH
+- [x] **09. Fila do dia com permissão por unidade** — CH
   `GET /fila?unidade_id=&data=` e `GET /fila/unidades` (recepção/admin); itens ordenados por
   início com `chegada_em` e flags `pode_check_in`/`pode_faltou`; admin em qualquer unidade,
   recepção só nas vinculadas (403); endpoints `GET/POST/DELETE /recepcao-unidades` (admin).

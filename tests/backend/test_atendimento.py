@@ -348,3 +348,113 @@ def test_faltou_de_consulta_cancelada_devolve_422(client, c):
     Relogio.atual = local(f"{SEG} 09:31")
     assert client.post(f"/api/consultas/{c['consulta'].id}/cancelar", headers=auth(c["recepcao"])).status_code == 200
     assert marcar_faltou(client, c["consulta"].id, c["recepcao"]).status_code == 422
+
+
+# ---------- fila do dia ----------
+
+def vincular_recepcao(db, usuario, unidade):
+    from app.atendimento.models import recepcao_unidade
+
+    db.execute(recepcao_unidade.insert().values(usuario_id=usuario.id, unidade_id=unidade.id))
+    db.commit()
+
+
+def pedido_fila(client, unidade_id, dia, usuario):
+    return client.get(f"/api/fila?unidade_id={unidade_id}&data={dia}", headers=auth(usuario))
+
+
+def test_fila_ordenada_por_horario_com_flags(client, db, c):
+    vincular_recepcao(db, c["recepcao"], c["centro"])
+    outro = criar_usuario(db, nome="Outro Paciente")
+    criar_consulta(db, outro, c["prof"], c["centro"], c["tipo"], local(f"{SEG} 10:00"))
+    Relogio.atual = local(f"{SEG} 08:00")
+    r = pedido_fila(client, c["centro"].id, SEG, c["recepcao"])
+    assert r.status_code == 200
+    itens = r.json()
+    assert [i["paciente"]["nome"] for i in itens] == ["Maria Paciente", "Outro Paciente"]
+    assert (itens[0]["pode_check_in"], itens[0]["pode_faltou"]) == (True, False)  # 09:00, agora 08:00
+    assert (itens[1]["pode_check_in"], itens[1]["pode_faltou"]) == (False, False)  # 10:00: falta mais de 1h
+    assert all(i["chegada_em"] is None for i in itens)
+
+
+def test_fila_flag_de_faltou_apos_30_minutos(client, db, c):
+    vincular_recepcao(db, c["recepcao"], c["centro"])
+    Relogio.atual = local(f"{SEG} 09:31")
+    itens = pedido_fila(client, c["centro"].id, SEG, c["recepcao"]).json()
+    assert itens[0]["pode_faltou"] is True and itens[0]["pode_check_in"] is True
+
+
+def test_fila_mostra_chegada_e_status_apos_check_in(client, db, c):
+    vincular_recepcao(db, c["recepcao"], c["centro"])
+    Relogio.atual = local(f"{SEG} 08:30")
+    assert check_in(client, c["consulta"].id, c["paciente"]).status_code == 200
+    itens = pedido_fila(client, c["centro"].id, SEG, c["recepcao"]).json()
+    assert itens[0]["status"] == "confirmada" and itens[0]["chegada_em"] is not None
+    assert itens[0]["pode_check_in"] is False
+
+
+def test_fila_de_outro_dia_nao_traz_consultas(client, db, c):
+    vincular_recepcao(db, c["recepcao"], c["centro"])
+    assert pedido_fila(client, c["centro"].id, "2026-10-13", c["recepcao"]).json() == []
+
+
+def test_recepcao_sem_vinculo_nao_ve_a_fila(client, c):
+    assert pedido_fila(client, c["centro"].id, SEG, c["recepcao"]).status_code == 403
+
+
+def test_recepcao_vinculada_so_a_outra_unidade_nao_ve_a_fila(client, db, c):
+    outra_unidade = criar_unidade(db, nome="Unidade Sul")
+    vincular_recepcao(db, c["recepcao"], outra_unidade)
+    assert pedido_fila(client, c["centro"].id, SEG, c["recepcao"]).status_code == 403
+
+
+def test_admin_ve_a_fila_de_qualquer_unidade(client, c):
+    assert pedido_fila(client, c["centro"].id, SEG, c["admin"]).status_code == 200
+
+
+def test_unidade_inexistente_na_fila_devolve_404(client, c):
+    assert pedido_fila(client, 999999, SEG, c["admin"]).status_code == 404
+
+
+def test_paciente_nao_ve_a_fila(client, c):
+    assert pedido_fila(client, c["centro"].id, SEG, c["paciente"]).status_code == 403
+
+
+def test_fila_unidades_respeita_o_vinculo(client, db, c):
+    outra_unidade = criar_unidade(db, nome="Unidade Sul")
+    vincular_recepcao(db, c["recepcao"], c["centro"])
+    r = client.get("/api/fila/unidades", headers=auth(c["recepcao"]))
+    assert [u["id"] for u in r.json()] == [c["centro"].id]
+    r2 = client.get("/api/fila/unidades", headers=auth(c["admin"]))
+    assert {u["id"] for u in r2.json()} == {c["centro"].id, outra_unidade.id}
+
+
+# ---------- vínculo recepção ↔ unidade (admin) ----------
+
+def test_vinculo_e_desvinculo_somente_admin(client, db, c):
+    corpo = {"usuario_id": c["recepcao"].id, "unidade_id": c["centro"].id}
+    assert client.post("/api/recepcao-unidades", json=corpo, headers=auth(c["recepcao"])).status_code == 403
+    r = client.post("/api/recepcao-unidades", json=corpo, headers=auth(c["admin"]))
+    assert r.status_code == 201 and r.json()["unidade_ids"] == [c["centro"].id]
+    assert client.get("/api/recepcao-unidades", headers=auth(c["admin"])).json()[0]["unidade_ids"] == [c["centro"].id]
+    # vínculo duplicado é idempotente
+    assert client.post("/api/recepcao-unidades", json=corpo, headers=auth(c["admin"])).status_code == 201
+    assert client.request("DELETE", "/api/recepcao-unidades", json=corpo, headers=auth(c["admin"])).status_code == 204
+    assert client.get("/api/recepcao-unidades", headers=auth(c["admin"])).json()[0]["unidade_ids"] == []
+    assert client.request("DELETE", "/api/recepcao-unidades", json=corpo, headers=auth(c["admin"])).status_code == 404
+
+
+def test_vinculo_de_usuario_que_nao_e_recepcao_devolve_404(client, c):
+    r = client.post("/api/recepcao-unidades",
+                    json={"usuario_id": c["paciente"].id, "unidade_id": c["centro"].id},
+                    headers=auth(c["admin"]))
+    assert r.status_code == 404
+
+
+def test_vinculo_de_unidade_inativa_devolve_404(client, db, c):
+    c["centro"].ativa = False
+    db.commit()
+    r = client.post("/api/recepcao-unidades",
+                    json={"usuario_id": c["recepcao"].id, "unidade_id": c["centro"].id},
+                    headers=auth(c["admin"]))
+    assert r.status_code == 404

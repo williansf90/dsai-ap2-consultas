@@ -1,13 +1,15 @@
 """Check-in e atendimento: transições protegidas por lock na linha da consulta."""
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.agendamento.models import Consulta
-from app.agendamento.service import mudar_status
+from app.agendamento.service import com_permissoes, mudar_status
+from app.atendimento.models import recepcao_unidade
 from app.auth.models import Usuario
-from app.clinicas.models import Profissional
+from app.clinicas.models import Profissional, Unidade
 from app.core.erros import NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
 
@@ -97,3 +99,107 @@ def marcar_faltou(db: Session, consulta_id: int, autor: Usuario) -> Consulta:
     mudar_status(db, consulta, "faltou", autor)
     db.commit()
     return consulta
+
+
+# ---------- fila do dia ----------
+
+def unidades_permitidas(db: Session, usuario: Usuario) -> list[Unidade]:
+    """Admin vê todas as unidades ativas; recepção, só as vinculadas."""
+    base = select(Unidade).where(Unidade.ativa.is_(True)).order_by(Unidade.nome)
+    if usuario.perfil == "admin":
+        return list(db.scalars(base))
+    ids = db.scalars(
+        select(recepcao_unidade.c.unidade_id).where(recepcao_unidade.c.usuario_id == usuario.id)
+    ).all()
+    if not ids:
+        return []
+    return list(db.scalars(base.where(Unidade.id.in_(ids))))
+
+
+def _validar_acesso_unidade(db: Session, usuario: Usuario, unidade_id: int) -> Unidade:
+    unidade = db.get(Unidade, unidade_id)
+    if unidade is None or not unidade.ativa:
+        raise NaoEncontrado("Unidade não encontrada.")
+    if usuario.perfil != "admin":
+        vinculada = db.scalar(select(recepcao_unidade.c.unidade_id).where(
+            recepcao_unidade.c.usuario_id == usuario.id,
+            recepcao_unidade.c.unidade_id == unidade_id,
+        ))
+        if vinculada is None:
+            raise Proibido("Você não tem acesso à fila desta unidade.")
+    return unidade
+
+
+def fila_do_dia(db: Session, usuario: Usuario, unidade_id: int, dia: date) -> list[dict]:
+    """Consultas do dia/unidade ordenadas por horário, com flags de ação."""
+    _validar_acesso_unidade(db, usuario, unidade_id)
+    inicio = datetime.combine(dia, time.min, FUSO_LOCAL)
+    fim = inicio + timedelta(days=1)
+    consultas = db.scalars(
+        select(Consulta)
+        .where(Consulta.unidade_id == unidade_id, Consulta.inicio >= inicio, Consulta.inicio < fim)
+        .order_by(Consulta.inicio)
+    ).all()
+    agora = agora_utc()
+    itens = []
+    for consulta in consultas:
+        itens.append({
+            **com_permissoes(consulta, usuario),
+            "chegada_em": consulta.chegada_em,
+            "pode_check_in": (
+                consulta.status == "marcada"
+                and agora.astimezone(FUSO_LOCAL).date() == dia
+                and agora >= consulta.inicio - ANTECEDENCIA_CHECK_IN
+            ),
+            "pode_faltou": (
+                consulta.status == "marcada" and agora >= consulta.inicio + ANTECEDENCIA_FALTA
+            ),
+        })
+    return itens
+
+
+# ---------- vínculo recepção ↔ unidade (admin) ----------
+
+def vinculos_recepcao(db: Session) -> list[dict]:
+    usuarios = list(db.scalars(
+        select(Usuario).where(Usuario.perfil == "recepcao", Usuario.ativo.is_(True)).order_by(Usuario.nome)
+    ))
+    pares = db.execute(select(recepcao_unidade.c.usuario_id, recepcao_unidade.c.unidade_id)).all()
+    mapa: dict[int, list[int]] = {}
+    for usuario_id, unidade_id in pares:
+        mapa.setdefault(usuario_id, []).append(unidade_id)
+    return [
+        {"usuario": {"id": u.id, "nome": u.nome, "email": u.email},
+         "unidade_ids": sorted(mapa.get(u.id, []))}
+        for u in usuarios
+    ]
+
+
+def _validar_vinculo(db: Session, usuario_id: int, unidade_id: int) -> None:
+    usuario = db.get(Usuario, usuario_id)
+    if usuario is None or usuario.perfil != "recepcao" or not usuario.ativo:
+        raise NaoEncontrado("Recepção não encontrada.")
+    unidade = db.get(Unidade, unidade_id)
+    if unidade is None or not unidade.ativa:
+        raise NaoEncontrado("Unidade não encontrada.")
+
+
+def vincular(db: Session, usuario_id: int, unidade_id: int) -> dict:
+    _validar_vinculo(db, usuario_id, unidade_id)
+    db.execute(
+        pg_insert(recepcao_unidade)
+        .values(usuario_id=usuario_id, unidade_id=unidade_id)
+        .on_conflict_do_nothing()
+    )
+    db.commit()
+    return next(v for v in vinculos_recepcao(db) if v["usuario"]["id"] == usuario_id)
+
+
+def desvincular(db: Session, usuario_id: int, unidade_id: int) -> None:
+    resultado = db.execute(delete(recepcao_unidade).where(
+        recepcao_unidade.c.usuario_id == usuario_id,
+        recepcao_unidade.c.unidade_id == unidade_id,
+    ))
+    if resultado.rowcount == 0:
+        raise NaoEncontrado("Vínculo não encontrado.")
+    db.commit()
