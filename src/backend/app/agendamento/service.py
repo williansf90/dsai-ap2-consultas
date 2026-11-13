@@ -13,6 +13,11 @@ from app.auth.service import somente_digitos
 from app.clinicas.models import Profissional
 from app.core.erros import Conflito, NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
+from app.notificacoes.service import (
+    notificar_consulta_cancelada_clinica,
+    notificar_consulta_marcada,
+    notificar_consulta_remarcada,
+)
 
 MAX_FUTURAS_MARCADAS = 3
 MAX_REMARCACOES = 2
@@ -168,6 +173,7 @@ def marcar(db: Session, autor: Usuario, dados: MarcarIn) -> Consulta:
     paciente = _paciente_alvo(db, autor, dados.paciente_id)
     try:
         consulta = _criar(db, autor, paciente, dados)
+        notificar_consulta_marcada(db, paciente, consulta)
     except Exception:
         db.rollback()
         raise

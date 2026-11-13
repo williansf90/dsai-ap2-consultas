@@ -36,7 +36,7 @@ são fora do escopo da spec (permanente).
   Teste: textos em português com os dados da consulta (profissional, unidade, tipo, data/hora;
   na remarcação, data antiga e nova).
 
-- [ ] **04. Notificação ao marcar** — NT
+- [x] **04. Notificação ao marcar** — NT
   `agendamento.service.marcar`: cria `consulta_marcada` para o paciente na mesma transação,
   antes do `_commit` (sem commit próprio), tanto quando o paciente marca para si quanto quando
   a recepção marca em nome dele.
