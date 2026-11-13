@@ -49,7 +49,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: dono OK; outro profissional → 403; recepção → 403; paciente → 403; sem check-in
   (marcada) → 422; horário de início gravado.
 
-- [ ] **06. Finalizar com anotação** — CH
+- [x] **06. Finalizar com anotação** — CH
   `POST /consultas/{id}/finalizar` somente para o profissional dono: `em_atendimento →
   realizada` + `atendimento_fim`; `anotacao` obrigatória, não vazia e ≤ 5.000 (422).
   Testes: anotação salva; vazia/só espaços → 422; > 5.000 → 422; hora de fim gravada;

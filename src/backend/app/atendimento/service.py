@@ -11,6 +11,7 @@ from app.core.erros import NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
 
 ANTECEDENCIA_CHECK_IN = timedelta(hours=1)
+MAX_ANOTACAO = 5000
 
 
 def obter_para_transicao(db: Session, consulta_id: int) -> Consulta:
@@ -48,5 +49,22 @@ def chamar(db: Session, consulta_id: int, autor: Usuario) -> Consulta:
         raise Proibido("Somente o profissional desta consulta pode chamar o paciente.")
     mudar_status(db, consulta, "em_atendimento", autor)
     consulta.atendimento_inicio = agora_utc()
+    db.commit()
+    return consulta
+
+
+def finalizar(db: Session, consulta_id: int, autor: Usuario, anotacao: str) -> Consulta:
+    """em_atendimento → realizada; anotação obrigatória, não vazia e ≤ 5.000; grava fim."""
+    consulta = obter_para_transicao(db, consulta_id)
+    if consulta.profissional.usuario_id != autor.id:
+        raise Proibido("Somente o profissional desta consulta pode finalizar o atendimento.")
+    texto = anotacao.strip()
+    if not texto:
+        raise RegraViolada("Informe a anotação do atendimento.")
+    if len(texto) > MAX_ANOTACAO:
+        raise RegraViolada(f"A anotação deve ter no máximo {MAX_ANOTACAO} caracteres.")
+    mudar_status(db, consulta, "realizada", autor)
+    consulta.atendimento_fim = agora_utc()
+    consulta.anotacao = texto
     db.commit()
     return consulta

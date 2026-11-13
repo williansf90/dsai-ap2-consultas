@@ -207,3 +207,58 @@ def test_outro_profissional_e_recepcao_nao_podem_chamar(client, db, c):
     assert chamar(client, c["consulta"].id, outro).status_code == 403
     assert chamar(client, c["consulta"].id, c["recepcao"]).status_code == 403
     assert chamar(client, c["consulta"].id, c["paciente"]).status_code == 403
+
+
+# ---------- finalizar com anotação ----------
+
+def finalizar(client, consulta_id, usuario, anotacao):
+    return client.post(f"/api/consultas/{consulta_id}/finalizar",
+                       json={"anotacao": anotacao}, headers=auth(usuario))
+
+
+def preparar_em_atendimento(client, c):
+    preparar_confirmada(client, c)
+    assert chamar(client, c["consulta"].id, c["prof_usuario"]).status_code == 200
+
+
+def test_finalizar_salva_anotacao_e_registra_fim(client, db, c):
+    preparar_em_atendimento(client, c)
+    r = finalizar(client, c["consulta"].id, c["prof_usuario"], "  Paciente com boa evolução.  ")
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "realizada"
+    db.refresh(c["consulta"])
+    assert c["consulta"].anotacao == "Paciente com boa evolução."
+    assert c["consulta"].atendimento_fim == Relogio.atual
+
+
+def test_finalizar_sem_anotacao_devolve_422_e_nao_muda_o_status(client, db, c):
+    preparar_em_atendimento(client, c)
+    r = finalizar(client, c["consulta"].id, c["prof_usuario"], "   ")
+    assert r.status_code == 422
+    db.refresh(c["consulta"])
+    assert c["consulta"].status == "em_atendimento" and c["consulta"].anotacao is None
+
+
+def test_finalizar_com_anotacao_acima_de_5000_devolve_422(client, db, c):
+    preparar_em_atendimento(client, c)
+    r = finalizar(client, c["consulta"].id, c["prof_usuario"], "x" * 5001)
+    assert r.status_code == 422
+    db.refresh(c["consulta"])
+    assert c["consulta"].status == "em_atendimento" and c["consulta"].anotacao is None
+
+
+def test_finalizar_no_limite_de_5000_passa(client, c):
+    preparar_em_atendimento(client, c)
+    assert finalizar(client, c["consulta"].id, c["prof_usuario"], "x" * 5000).status_code == 200
+
+
+def test_finalizar_sem_chamar_devolve_422(client, c):
+    preparar_confirmada(client, c)
+    assert finalizar(client, c["consulta"].id, c["prof_usuario"], "Anotação.").status_code == 422
+
+
+def test_outros_perfis_nao_finalizam(client, db, c):
+    preparar_em_atendimento(client, c)
+    outro = criar_usuario(db, "profissional", nome="Dr. Outro")
+    for usuario in (outro, c["recepcao"], c["paciente"]):
+        assert finalizar(client, c["consulta"].id, usuario, "Anotação.").status_code == 403
