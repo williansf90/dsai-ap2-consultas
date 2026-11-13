@@ -75,7 +75,7 @@ são fora do escopo da spec (permanente).
   Testes: renderização e destaque de não lidas; clique chama PATCH e navega; marcar todas
   chama POST e zera o badge; erro da API em português; link presente.
 
-- [ ] **10. Rota, estilo e revisão final** — NT
+- [x] **10. Rota, estilo e revisão final** — NT
   Rota `/notificacoes` protegida para `["paciente"]` em `App.tsx`; classes do sino/badge/central
   em `estilos.css`; revisão do diff; `pytest` e `npm test` completos verdes.
   Teste: suíte completa (backend + frontend) verde.

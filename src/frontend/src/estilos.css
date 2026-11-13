@@ -59,3 +59,10 @@ button:disabled { opacity: 0.6; cursor: default; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--cor-borda); }
 .tabela-rolagem { overflow-x: auto; }
+
+/* notificações */
+.sino { position: relative; display: inline-flex; align-items: center; font-size: 1.2rem; text-decoration: none; }
+.sino-contador { position: absolute; top: -8px; right: -10px; min-width: 18px; padding: 1px 5px; border-radius: 999px; background: var(--cor-erro); color: var(--cor-fundo); font-size: 0.7rem; font-weight: 700; text-align: center; }
+.notificacao { display: grid; gap: 4px; width: 100%; text-align: left; background: var(--cor-superficie); color: var(--cor-texto); border: 1px solid var(--cor-borda); }
+.notificacao.nao-lida { border-left: 4px solid var(--cor-primaria); }
+.notificacao-titulo { font-weight: 600; }

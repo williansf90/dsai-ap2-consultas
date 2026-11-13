@@ -14,6 +14,7 @@ import AdminFeriados from "@/features/clinicas/AdminFeriados";
 import AdminProfissionais from "@/features/clinicas/AdminProfissionais";
 import AdminUnidades from "@/features/clinicas/AdminUnidades";
 import PaginaProfissional from "@/features/clinicas/PaginaProfissional";
+import CentralNotificacoes from "@/features/notificacoes/CentralNotificacoes";
 import { AuthProvider } from "@/shared/auth";
 import Layout from "@/shared/Layout";
 import RotaProtegida from "@/shared/RotaProtegida";
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/agendar/confirmar" element={<ConfirmarAgendamento />} />
             <Route path="/minhas-consultas" element={<MinhasConsultas />} />
             <Route path="/minhas-consultas/:id/remarcar" element={<Remarcar />} />
+            <Route path="/notificacoes" element={<CentralNotificacoes />} />
           </Route>
           <Route element={<RotaProtegida perfis={["profissional"]} />}>
             <Route path="/profissional/agenda" element={<AgendaProfissional />} />
