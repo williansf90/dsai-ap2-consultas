@@ -62,7 +62,7 @@ são fora do escopo da spec (permanente).
   Testes: lista só as próprias (privacidade); PATCH de notificação alheia → 404 (autorização);
   paginação; contagem de não lidas; marcar todas devolve o total atualizado; 401 sem token.
 
-- [ ] **08. Sino no cabeçalho (paciente)** — NT
+- [x] **08. Sino no cabeçalho (paciente)** — NT
   `features/notificacoes/{tipos.ts,Sino.tsx}`; `shared/Layout.tsx` renderiza o sino apenas
   para pacientes; badge com o total de não lidas (até "9+").
   Testes: sino visível para paciente e ausente para os demais perfis e deslogado; contagem

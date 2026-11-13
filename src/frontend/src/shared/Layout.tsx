@@ -1,4 +1,5 @@
 import { Link, Outlet, useNavigate } from "react-router-dom";
+import Sino from "@/features/notificacoes/Sino";
 import { useAuth, type Perfil } from "./auth";
 
 const MENU: Record<Perfil, { para: string; rotulo: string }[]> = {
@@ -35,6 +36,7 @@ export default function Layout() {
                   {item.rotulo}
                 </Link>
               ))}
+              {usuario.perfil === "paciente" && <Sino />}
               <span className="suave">{usuario.nome.split(" ")[0]}</span>
               <button
                 className="secundario"
