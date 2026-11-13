@@ -29,6 +29,13 @@ def test_seed_cria_os_dados_minimos_e_e_idempotente(db):
     medico = db.scalar(select(Usuario).where(Usuario.email == "medico@demo.com"))
     assert db.scalar(select(Profissional).where(Profissional.usuario_id == medico.id))
 
+    # a recepção de demonstração fica vinculada a todas as unidades (fila do dia)
+    from app.atendimento.models import recepcao_unidade
+
+    recepcao = db.scalar(select(Usuario).where(Usuario.perfil == "recepcao"))
+    assert db.scalar(select(func.count()).select_from(recepcao_unidade)
+                     .where(recepcao_unidade.c.usuario_id == recepcao.id)) == 3
+
     total = contar(db, Profissional)
     assert popular(db) is False
     assert contar(db, Profissional) == total

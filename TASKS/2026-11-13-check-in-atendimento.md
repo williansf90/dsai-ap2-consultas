@@ -75,7 +75,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: ordenação e flags; recepção sem vínculo → 403; com vínculo → OK; admin em qualquer
   unidade; vínculo/desvínculo só admin; 401 sem token; unidade inexistente → 404.
 
-- [ ] **10. Seed vincula recepção de demonstração** — CH
+- [x] **10. Seed vincula recepção de demonstração** — CH
   `seed.py`: vincula a recepção demo às unidades demo (via `recepcao_unidade`).
   Teste: `test_seed.py` continua verde e a recepção demo aparece vinculada.
 

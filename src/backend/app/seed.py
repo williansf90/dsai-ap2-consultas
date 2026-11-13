@@ -9,11 +9,13 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.agenda.models import Feriado, GradeHorario
 from app.agenda.service import carregar_dados_agenda, gerar_horarios, hoje_local
 from app.agendamento.models import Consulta, HistoricoStatus
+from app.atendimento.models import recepcao_unidade
 from app.auth.models import Usuario
 from app.clinicas.models import Especialidade, Profissional, TipoConsulta, Unidade
 from app.core.db import SessionLocal
@@ -216,6 +218,13 @@ def popular(db: Session, semente: int = 42) -> bool:
     rng = random.Random(semente)
     unidades, especialidades = _criar_cadastros(db, dados, rng)
     demo, pacientes = _criar_usuarios(db, dados, rng)
+    # a recepção de demonstração atende todas as unidades (fila do dia)
+    for unidade in unidades:
+        db.execute(
+            pg_insert(recepcao_unidade)
+            .values(usuario_id=demo["recepcao"].id, unidade_id=unidade.id)
+            .on_conflict_do_nothing()
+        )
     profissionais = _criar_profissionais(db, dados, rng, unidades, especialidades, demo["profissional"])
     _criar_consultas(db, rng, profissionais, pacientes, demo["recepcao"])
     db.commit()
