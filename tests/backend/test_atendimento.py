@@ -458,3 +458,47 @@ def test_vinculo_de_unidade_inativa_devolve_404(client, db, c):
                     json={"usuario_id": c["recepcao"].id, "unidade_id": c["centro"].id},
                     headers=auth(c["admin"]))
     assert r.status_code == 404
+
+
+# ---------- comprovante de comparecimento (PDF) ----------
+
+def baixar_comprovante(client, consulta_id, usuario):
+    return client.get(f"/api/consultas/{consulta_id}/comprovante.pdf", headers=auth(usuario))
+
+
+def test_comprovante_de_consulta_realizada_sem_anotacao(client, db, c):
+    preparar_em_atendimento(client, c)
+    assert finalizar(client, c["consulta"].id, c["prof_usuario"], "Evolução boa.").status_code == 200
+    r = baixar_comprovante(client, c["consulta"].id, c["paciente"])
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/pdf")
+    conteudo = r.content
+    assert conteudo.startswith(b"%PDF")
+    assert b"Maria Paciente" in conteudo
+    assert b"Dr. Jo" in conteudo  # "João" tem acento; o prefixo ASCII basta
+    assert b"Unidade Centro" in conteudo
+    assert b"12/10/2026" in conteudo  # data no fuso de São Paulo
+    assert b"Evolu" not in conteudo  # decisão 10: a anotação não aparece no comprovante
+
+
+def test_comprovante_de_consulta_nao_realizada_devolve_422(client, c):
+    r = baixar_comprovante(client, c["consulta"].id, c["paciente"])
+    assert r.status_code == 422
+    assert "realizadas" in r.json()["detail"]
+
+
+def test_comprovante_de_outro_paciente_devolve_404(client, db, c):
+    preparar_em_atendimento(client, c)
+    assert finalizar(client, c["consulta"].id, c["prof_usuario"], "Evolução boa.").status_code == 200
+    intruso = criar_usuario(db, nome="Intruso")
+    assert baixar_comprovante(client, c["consulta"].id, intruso).status_code == 404
+
+
+def test_comprovante_exige_login(client, c):
+    assert client.get(f"/api/consultas/{c['consulta'].id}/comprovante.pdf").status_code == 401
+
+
+def test_comprovante_de_recepcao_devolve_403(client, db, c):
+    preparar_em_atendimento(client, c)
+    assert finalizar(client, c["consulta"].id, c["prof_usuario"], "Evolução boa.").status_code == 200
+    assert baixar_comprovante(client, c["consulta"].id, c["recepcao"]).status_code == 403

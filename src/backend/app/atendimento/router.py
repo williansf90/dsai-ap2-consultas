@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.agendamento.schemas import ConsultaOut, UnidadeRef
@@ -73,3 +73,15 @@ def vincular(dados: VinculoIn, _=Depends(so_admin), db: Session = Depends(get_db
 @router.delete("/recepcao-unidades", status_code=status.HTTP_204_NO_CONTENT)
 def desvincular(dados: VinculoIn, _=Depends(so_admin), db: Session = Depends(get_db)):
     service.desvincular(db, dados.usuario_id, dados.unidade_id)
+
+
+# ---------- comprovante de comparecimento ----------
+
+@router.get("/consultas/{consulta_id}/comprovante.pdf")
+def comprovante(consulta_id: int, usuario=Depends(exige_perfil("paciente")), db: Session = Depends(get_db)):
+    conteudo = service.comprovante(db, consulta_id, usuario)
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="comprovante-{consulta_id}.pdf"'},
+    )

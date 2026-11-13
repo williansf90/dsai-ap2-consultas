@@ -203,3 +203,17 @@ def desvincular(db: Session, usuario_id: int, unidade_id: int) -> None:
     if resultado.rowcount == 0:
         raise NaoEncontrado("Vínculo não encontrado.")
     db.commit()
+
+
+# ---------- comprovante de comparecimento ----------
+
+def comprovante(db: Session, consulta_id: int, paciente: Usuario) -> bytes:
+    """PDF de consulta realizada, disponível apenas para o paciente dono."""
+    from app.atendimento.comprovante import gerar_comprovante
+
+    consulta = db.get(Consulta, consulta_id)
+    if consulta is None or consulta.paciente_id != paciente.id:
+        raise NaoEncontrado("Consulta não encontrada.")
+    if consulta.status != "realizada":
+        raise RegraViolada("O comprovante só está disponível para consultas realizadas.")
+    return gerar_comprovante(consulta)

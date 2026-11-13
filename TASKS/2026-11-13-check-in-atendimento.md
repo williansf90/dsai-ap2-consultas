@@ -79,7 +79,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   `seed.py`: vincula a recepção demo às unidades demo (via `recepcao_unidade`).
   Teste: `test_seed.py` continua verde e a recepção demo aparece vinculada.
 
-- [ ] **11. Comprovante PDF com ReportLab** — CH
+- [x] **11. Comprovante PDF com ReportLab** — CH
   Adicionar `reportlab` (versão fixada) em `requirements.txt`; `GET
   /consultas/{id}/comprovante.pdf` para o paciente dono, só `realizada` (422): PDF em memória
   com paciente, profissional (nome e registro), unidade, tipo, data/hora no fuso local e hora
