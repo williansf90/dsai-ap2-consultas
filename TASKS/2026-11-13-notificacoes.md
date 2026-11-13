@@ -30,7 +30,7 @@ são fora do escopo da spec (permanente).
   Testes (`tests/backend/test_migracoes.py`): `alembic upgrade head` num banco temporário cria
   `notificacoes` com o CHECK; `downgrade` remove a tabela; o banco recusa tipo fora da lista.
 
-- [ ] **03. Templates e criação de notificação** — NT
+- [x] **03. Templates e criação de notificação** — NT
   `app/notificacoes/textos.py` (título/texto por tipo com variáveis; data/hora formatada em
   `America/Sao_Paulo`) e `service.criar` (renderiza na criação e valida o tipo).
   Teste: textos em português com os dados da consulta (profissional, unidade, tipo, data/hora;
