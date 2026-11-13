@@ -8,12 +8,16 @@ const MENU: Record<Perfil, { para: string; rotulo: string }[]> = {
     { para: "/profissional/agenda", rotulo: "Minha agenda" },
     { para: "/profissional/disponibilidade", rotulo: "Disponibilidade" },
   ],
-  recepcao: [{ para: "/recepcao/agendar", rotulo: "Marcar para paciente" }],
+  recepcao: [
+    { para: "/recepcao/agendar", rotulo: "Marcar para paciente" },
+    { para: "/recepcao/fila", rotulo: "Fila do dia" },
+  ],
   admin: [
     { para: "/admin/unidades", rotulo: "Unidades" },
     { para: "/admin/especialidades", rotulo: "Especialidades" },
     { para: "/admin/profissionais", rotulo: "Profissionais" },
     { para: "/admin/feriados", rotulo: "Feriados" },
+    { para: "/recepcao/fila", rotulo: "Fila do dia" },
   ],
 };
 

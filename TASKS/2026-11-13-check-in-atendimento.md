@@ -87,7 +87,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: content-type `application/pdf`; conteúdo contém os dados e **não** contém a
   anotação; não realizada → 422; não dono → 404; datas em `America/Sao_Paulo`.
 
-- [ ] **12. Fila da recepção (frontend)** — CH
+- [x] **12. Fila da recepção (frontend)** — CH
   `features/atendimento/{tipos.ts,FilaDoDia.tsx}`: seletor de unidade (só as permitidas),
   lista do dia com status e horário de chegada, botões Check-in/Faltou conforme as flags,
   **refresh automático de 30 s** (`refetchInterval`); rota `/recepcao/fila` (recepção/admin)

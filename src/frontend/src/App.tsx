@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import AgendaProfissional from "@/features/agenda/AgendaProfissional";
 import Disponibilidade from "@/features/agenda/Disponibilidade";
 import AgendarRecepcao from "@/features/agendamento/AgendarRecepcao";
+import FilaDoDia from "@/features/atendimento/FilaDoDia";
 import ConfirmarAgendamento from "@/features/agendamento/ConfirmarAgendamento";
 import MinhasConsultas from "@/features/agendamento/MinhasConsultas";
 import Remarcar from "@/features/agendamento/Remarcar";
@@ -41,6 +42,7 @@ export default function App() {
           </Route>
           <Route element={<RotaProtegida perfis={["recepcao", "admin"]} />}>
             <Route path="/recepcao/agendar" element={<AgendarRecepcao />} />
+            <Route path="/recepcao/fila" element={<FilaDoDia />} />
           </Route>
           <Route element={<RotaProtegida perfis={["admin"]} />}>
             <Route path="/admin/unidades" element={<AdminUnidades />} />
