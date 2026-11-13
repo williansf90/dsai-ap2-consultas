@@ -30,7 +30,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes (`tests/backend/test_migracoes.py`): upgrade cria colunas/tabela com o CHECK;
   downgrade remove; CHECK recusa anotação > 5.000.
 
-- [ ] **03. Transições protegidas contra concorrência** — CH
+- [x] **03. Transições protegidas contra concorrência** — CH
   Helper em `app/atendimento/service.py`: obter consulta com `SELECT ... FOR UPDATE` antes de
   validar e transicionar; todas as ações passam por ele.
   Testes: duas threads fazem check-in na mesma consulta → exatamente uma vence (201/200) e a
