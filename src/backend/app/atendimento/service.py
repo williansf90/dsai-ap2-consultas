@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.agendamento.models import Consulta
 from app.agendamento.service import mudar_status
 from app.auth.models import Usuario
+from app.clinicas.models import Profissional
 from app.core.erros import NaoEncontrado, Proibido, RegraViolada
 from app.core.tempo import FUSO_LOCAL, agora_utc
 
@@ -68,3 +69,20 @@ def finalizar(db: Session, consulta_id: int, autor: Usuario, anotacao: str) -> C
     consulta.anotacao = texto
     db.commit()
     return consulta
+
+
+def anotacao(db: Session, consulta_id: int, autor: Usuario) -> str | None:
+    """Anotação visível só para o profissional da consulta e para quem compartilha especialidade."""
+    consulta = db.get(Consulta, consulta_id)
+    if consulta is None:
+        raise NaoEncontrado("Consulta não encontrada.")
+    if consulta.profissional.usuario_id == autor.id:
+        return consulta.anotacao
+    if autor.perfil != "profissional":
+        raise Proibido("Esta anotação não está disponível para o seu perfil.")
+    eu = db.scalar(select(Profissional).where(Profissional.usuario_id == autor.id))
+    minhas = {e.id for e in eu.especialidades} if eu else set()
+    em_comum = {e.id for e in consulta.profissional.especialidades} & minhas
+    if not em_comum:
+        raise Proibido("Esta anotação não está disponível para o seu perfil.")
+    return consulta.anotacao

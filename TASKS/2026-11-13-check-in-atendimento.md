@@ -55,7 +55,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   Testes: anotação salva; vazia/só espaços → 422; > 5.000 → 422; hora de fim gravada;
   perfis errados → 403; transação atômica (anotação inválida não muda o status).
 
-- [ ] **07. Visibilidade da anotação** — CH
+- [x] **07. Visibilidade da anotação** — CH
   `GET /consultas/{id}/anotacao`: autor (profissional da consulta) e profissionais com ao
   menos uma especialidade em comum veem; recepção, admin, paciente e profissionais sem
   especialidade comum → 403.

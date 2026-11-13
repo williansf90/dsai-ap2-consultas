@@ -262,3 +262,47 @@ def test_outros_perfis_nao_finalizam(client, db, c):
     outro = criar_usuario(db, "profissional", nome="Dr. Outro")
     for usuario in (outro, c["recepcao"], c["paciente"]):
         assert finalizar(client, c["consulta"].id, usuario, "Anotação.").status_code == 403
+
+
+# ---------- visibilidade da anotação ----------
+
+def marcar_realizada_com_anotacao(db, c, anotacao="Evolução boa."):
+    c["consulta"].status = "realizada"
+    c["consulta"].anotacao = anotacao
+    db.commit()
+
+
+def ver_anotacao(client, consulta_id, usuario):
+    return client.get(f"/api/consultas/{consulta_id}/anotacao", headers=auth(usuario))
+
+
+def test_autor_da_consulta_ve_a_anotacao(client, db, c):
+    marcar_realizada_com_anotacao(db, c)
+    r = ver_anotacao(client, c["consulta"].id, c["prof_usuario"])
+    assert r.status_code == 200 and r.json() == {"anotacao": "Evolução boa."}
+
+
+def test_profissional_da_mesma_especialidade_ve_a_anotacao(client, db, c):
+    marcar_realizada_com_anotacao(db, c)
+    colega = criar_usuario(db, "profissional", nome="Dra. Colega")
+    criar_profissional(db, nome="Dra. Colega", especialidades=[c["esp"]], unidades=[c["centro"]], usuario=colega)
+    r = ver_anotacao(client, c["consulta"].id, colega)
+    assert r.status_code == 200 and r.json() == {"anotacao": "Evolução boa."}
+
+
+def test_profissional_de_outra_especialidade_nao_ve_a_anotacao(client, db, c):
+    marcar_realizada_com_anotacao(db, c)
+    outra = criar_especialidade(db, nome="Dermatologia", tipos=(("Avaliação", 30, 20000),))
+    outro = criar_usuario(db, "profissional", nome="Dr. Outro")
+    criar_profissional(db, nome="Dr. Outro", especialidades=[outra], unidades=[c["centro"]], usuario=outro)
+    assert ver_anotacao(client, c["consulta"].id, outro).status_code == 403
+
+
+@pytest.mark.parametrize("perfil", ["paciente", "recepcao", "admin"])
+def test_paciente_recepcao_e_admin_nao_veem_a_anotacao(client, db, c, perfil):
+    marcar_realizada_com_anotacao(db, c)
+    assert ver_anotacao(client, c["consulta"].id, c[perfil]).status_code == 403
+
+
+def test_anotacao_de_consulta_inexistente_devolve_404(client, c):
+    assert ver_anotacao(client, 999999, c["prof_usuario"]).status_code == 404

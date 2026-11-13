@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 from app.agendamento.schemas import ConsultaOut
 from app.agendamento.service import com_permissoes
 from app.atendimento import service
-from app.atendimento.schemas import FinalizarIn
+from app.atendimento.schemas import AnotacaoOut, FinalizarIn
 from app.core.db import get_db
-from app.core.seguranca import exige_perfil
+from app.core.seguranca import exige_perfil, usuario_atual
 
 router = APIRouter(tags=["atendimento"])
 quem_faz_check_in = exige_perfil("paciente", "recepcao", "admin")
@@ -29,3 +29,8 @@ def chamar(consulta_id: int, usuario=Depends(profissional), db: Session = Depend
 def finalizar(consulta_id: int, dados: FinalizarIn, usuario=Depends(profissional), db: Session = Depends(get_db)):
     consulta = service.finalizar(db, consulta_id, usuario, dados.anotacao)
     return com_permissoes(consulta, usuario)
+
+
+@router.get("/consultas/{consulta_id}/anotacao", response_model=AnotacaoOut)
+def anotacao(consulta_id: int, usuario=Depends(usuario_atual), db: Session = Depends(get_db)):
+    return {"anotacao": service.anotacao(db, consulta_id, usuario)}
