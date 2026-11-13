@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.auth.models import Usuario
@@ -26,6 +26,7 @@ class Consulta(Base):
         CheckConstraint(f"status IN {STATUS}", name="ck_consultas_status"),
         CheckConstraint("inicio < fim", name="ck_consultas_intervalo"),
         CheckConstraint("remarcacoes BETWEEN 0 AND 2", name="ck_consultas_remarcacoes"),
+        CheckConstraint("anotacao IS NULL OR char_length(anotacao) <= 5000", name="ck_consultas_anotacao"),
         # rede de segurança no banco: mesmo profissional, mesmo início, só uma consulta ativa
         Index(
             "uq_consultas_profissional_inicio_ativa",
@@ -50,6 +51,11 @@ class Consulta(Base):
     consulta_origem_id: Mapped[int | None] = mapped_column(ForeignKey("consultas.id"))
     criado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # check-in e atendimento (SPEC/2026-09-30-check-in-e-atendimento.md)
+    chegada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    atendimento_inicio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    atendimento_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    anotacao: Mapped[str | None] = mapped_column(Text)
 
     paciente: Mapped[Usuario] = relationship(foreign_keys=[paciente_id], lazy="joined")
     profissional: Mapped[Profissional] = relationship(lazy="joined")

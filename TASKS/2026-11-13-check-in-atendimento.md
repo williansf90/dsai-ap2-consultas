@@ -22,7 +22,7 @@ e prontuário estruturado são fora do escopo da spec (permanente).
   matriz de critérios, decisões aprovadas, escopo V1. Sem código.
   Teste: nenhum (documentação); `git diff --check` limpo.
 
-- [ ] **02. Migração: colunas de atendimento e vínculo recepção↔unidade** — CH
+- [x] **02. Migração: colunas de atendimento e vínculo recepção↔unidade** — CH
   Colunas `chegada_em`, `atendimento_inicio`, `atendimento_fim` (timestamptz NULL) e
   `anotacao` (Text NULL, CHECK `char_length <= 5000`) em `consultas`; tabela `recepcao_unidade`
   (`usuario_id` + `unidade_id`, FKs CASCADE, PK composto) em `app/atendimento/models.py`;
