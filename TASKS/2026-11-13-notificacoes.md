@@ -18,12 +18,12 @@ são fora do escopo da spec (permanente).
 
 ---
 
-- [ ] **01. Documentação da fase** — NT
+- [x] **01. Documentação da fase** — NT
   `PLAN/2026-11-13-notificacoes.md` e `TASKS/2026-11-13-notificacoes.md`: escopo da V1,
   critérios cobertos e adiados, decisões aprovadas. Sem código.
   Teste: nenhum (documentação); `git diff --check` limpo.
 
-- [ ] **02. Modelo `Notificacao` e migração** — NT
+- [x] **02. Modelo `Notificacao` e migração** — NT
   `app/notificacoes/models.py` (CHECK `ck_notificacoes_tipo` com os 3 tipos, FKs `usuarios`
   ON DELETE CASCADE e `consultas` ON DELETE SET NULL, índice `(usuario_id, criado_em)`),
   migração Alembic nova e registro em `app/modelos.py`.
